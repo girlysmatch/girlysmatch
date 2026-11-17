@@ -27,6 +27,10 @@ export default function App() {
   const [liked, setLiked] = useState<number[]>([]);
   const [activeCategory, setActiveCategory] = useState("Todas");
   const [posts, setPosts] = useState(initialPosts);
+  const [likedPosts, setLikedPosts] = useState<number[]>([]);
+  const [expandedComments, setExpandedComments] = useState<number[]>([]);
+  const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>({});
+  const [commentsByPost, setCommentsByPost] = useState<Record<number, { author: string; body: string }[]>>({});
   const [postTitle, setPostTitle] = useState("");
   const [postBody, setPostBody] = useState("");
   const [showComposer, setShowComposer] = useState(false);
@@ -68,6 +72,18 @@ export default function App() {
     else { setIsDragging(false); setDragX(0); activePointer.current = null; }
   };
   const handleCardPointerCancel = () => { setIsDragging(false); setDragX(0); activePointer.current = null; };
+  const likePost = (postId: number) => {
+    if (likedPosts.includes(postId)) return;
+    setLikedPosts(old => [...old, postId]);
+    setPosts(old => old.map(p => p.id === postId ? { ...p, likes: p.likes + 1 } : p));
+  };
+  const toggleComments = (postId: number) => setExpandedComments(old => old.includes(postId) ? old.filter(id => id !== postId) : [...old, postId]);
+  const addComment = (postId: number) => {
+    const body = (commentDrafts[postId] || "").trim();
+    if (!body) return;
+    setCommentsByPost(old => ({ ...old, [postId]: [...(old[postId] || []), { author: "Tú", body }] }));
+    setCommentDrafts(old => ({ ...old, [postId]: "" }));
+  };
   const createPost = () => {
     if (!postTitle.trim() || !postBody.trim()) return;
     setPosts(old => [{ id: Date.now(), category: activeCategory === "Todas" ? categories[0] : activeCategory, title: postTitle, body: postBody, author: "Tú", initials: "T", time: "Ahora", likes: 0, comments: 0 }, ...old]);
@@ -93,7 +109,7 @@ export default function App() {
       {tab === "community" && <section className="content-view community-view"><div className="section-heading"><div><p className="eyebrow">THE GIRLYS COMMUNITY</p><h1>Hablemos de todo<span className="pink-dot">.</span></h1><p className="muted">Un espacio para compartir, preguntar y sentirte acompañada.</p></div><button className="primary-button compact" onClick={() => setShowComposer(true)}><Plus size={17}/> Publicar</button></div>
         <div className="community-tools"><div className="search-box"><Search size={17}/><input placeholder="Buscar conversaciones..." value={query} onChange={e => setQuery(e.target.value)}/></div></div>
         <div className="community-blocks"><button className={activeCategory === "Todas" ? "community-block all-block active" : "community-block all-block"} onClick={() => setActiveCategory("Todas")}><span className="block-symbol">✦</span><strong>Todos los temas</strong><small>Explora toda la comunidad</small></button>{categories.map((c, i) => <button key={c} className={activeCategory === c ? "community-block active" : "community-block"} onClick={() => setActiveCategory(c)}><span className="block-symbol">{["✧","♡","◎","✿","☾","✦","☕","↗"][i]}</span><strong>{c}</strong><small>Conversaciones y experiencias</small></button>)}</div>
-        <div className="feed">{visiblePosts.map(post => <article className="post-card" key={post.id}><div className="post-meta"><Avatar initials={post.initials} small/><div><strong>{post.author}</strong><span>{post.time}</span></div><span className="post-category">{post.category}</span></div><h3>{post.title}</h3><p>{post.body}</p><div className="post-actions"><button onClick={() => setPosts(old => old.map(p => p.id === post.id ? {...p, likes: p.likes + 1} : p))}><Heart size={16}/> {post.likes}</button><button onClick={() => flash("Los comentarios estarán disponibles en la siguiente versión.")}><MessageCircle size={16}/> {post.comments} comentarios</button><button className="save-action" onClick={() => flash("Publicación guardada.")}><Bookmark size={16}/></button></div></article>)}</div>
+        <div className="feed">{visiblePosts.map(post => <article className="post-card" key={post.id}><div className="post-meta"><Avatar initials={post.initials} small/><div><strong>{post.author}</strong><span>{post.time}</span></div><span className="post-category">{post.category}</span></div><h3>{post.title}</h3><p>{post.body}</p><div className="post-actions"><button className={likedPosts.includes(post.id) ? "post-liked" : ""} disabled={likedPosts.includes(post.id)} onClick={() => likePost(post.id)}><Heart size={16} fill={likedPosts.includes(post.id) ? "currentColor" : "none"}/> {post.likes}</button><button onClick={() => toggleComments(post.id)}><MessageCircle size={16}/> {post.comments + (commentsByPost[post.id]?.length || 0)} comentarios</button><button className="save-action" onClick={() => flash("Publicación guardada.")}><Bookmark size={16}/></button></div>{expandedComments.includes(post.id) && <div className="comments-panel">{(commentsByPost[post.id] || []).map((comment, index) => <div className="comment-item" key={index}><strong>{comment.author}</strong><p>{comment.body}</p></div>)}<div className="comment-compose"><input value={commentDrafts[post.id] || ""} onChange={e => setCommentDrafts(old => ({ ...old, [post.id]: e.target.value }))} onKeyDown={e => { if (e.key === "Enter") addComment(post.id); }} placeholder="Escribe un comentario..."/><button aria-label="Enviar comentario" disabled={!(commentDrafts[post.id] || "").trim()} onClick={() => addComment(post.id)}><Send size={16}/></button></div></div></article>)}</div>
       </section>}
       {tab === "profile" && <section className="content-view"><p className="eyebrow">THIS IS YOU</p><h1>Tu espacio<span className="pink-dot">.</span></h1><div className="own-profile"><Avatar initials="R" tone="lilac"/><div><h3>Tu perfil</h3><p className="muted">Completa tu perfil para que otras girls puedan conocerte.</p></div></div><div className="profile-menu"><button onClick={() => flash("El editor de perfil estará disponible muy pronto.")}>Editar mi perfil <ChevronRight size={18}/></button><button onClick={() => flash("Tus publicaciones guardadas aparecerán aquí.")}>Guardados <ChevronRight size={18}/></button><button onClick={() => flash("La configuración estará disponible muy pronto.")}>Ajustes y privacidad <ChevronRight size={18}/></button><button onClick={() => flash("Centro de ayuda próximamente.")}>Ayuda y seguridad <ChevronRight size={18}/></button></div></section>}
     </main>
