@@ -1,0 +1,9 @@
+name = "girlys-match"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-11-17"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "girlys-match-db"
+database_id = "c9e4cff0-ebea-4843-b55e-ba67c6eef666"
+migrations_dir = "migrations"
