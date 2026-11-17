@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Heart, MessageCircle, Users, UserRound, SlidersHorizontal, X, MapPin, Sparkles, Search, Plus, Bookmark, Send, ChevronRight, Bell, Menu } from "lucide-react";
 
 type Tab = "match" | "chats" | "community" | "profile";
@@ -19,6 +19,11 @@ function Avatar({ initials, tone = "rose", small = false }: { initials: string; 
 export default function App() {
   const [tab, setTab] = useState<Tab>("match");
   const [personIndex, setPersonIndex] = useState(0);
+  const [dragX, setDragX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
+  const dragStartX = useRef(0);
+  const activePointer = useRef<number | null>(null);
   const [liked, setLiked] = useState<number[]>([]);
   const [activeCategory, setActiveCategory] = useState("Todas");
   const [posts, setPosts] = useState(initialPosts);
@@ -35,6 +40,34 @@ export default function App() {
     else flash("¡Seguimos buscando a tus girls!");
     setPersonIndex(i => i + 1);
   };
+  const handleCardPointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return;
+    activePointer.current = event.pointerId;
+    dragStartX.current = event.clientX;
+    setIsDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const handleCardPointerMove = (event: React.PointerEvent<HTMLElement>) => {
+    if (!isDragging || activePointer.current !== event.pointerId) return;
+    setDragX(event.clientX - dragStartX.current);
+  };
+  const finishCardSwipe = (direction: "left" | "right") => {
+    setIsDragging(false);
+    setSwipeDirection(direction);
+    window.setTimeout(() => {
+      setDragX(0);
+      setSwipeDirection(null);
+      activePointer.current = null;
+      nextPerson(direction === "right");
+    }, 220);
+  };
+  const handleCardPointerUp = (event: React.PointerEvent<HTMLElement>) => {
+    if (activePointer.current !== event.pointerId) return;
+    const distance = event.clientX - dragStartX.current;
+    if (Math.abs(distance) > 105) finishCardSwipe(distance > 0 ? "right" : "left");
+    else { setIsDragging(false); setDragX(0); activePointer.current = null; }
+  };
+  const handleCardPointerCancel = () => { setIsDragging(false); setDragX(0); activePointer.current = null; };
   const createPost = () => {
     if (!postTitle.trim() || !postBody.trim()) return;
     setPosts(old => [{ id: Date.now(), category: activeCategory === "Todas" ? categories[0] : activeCategory, title: postTitle, body: postBody, author: "Tú", initials: "T", time: "Ahora", likes: 0, comments: 0 }, ...old]);
@@ -51,10 +84,10 @@ export default function App() {
     <main className="main">
       {tab === "match" && <section className="match-view">
         <div className="section-heading"><div><p className="eyebrow">YOUR NEXT GIRL FRIEND</p><h1>Find your girls<span className="pink-dot">.</span></h1><p className="muted">Personas con las que conectar, compartir y crear recuerdos.</p></div><button className="filter-button" onClick={() => flash("Los filtros estarán disponibles muy pronto.")}><SlidersHorizontal size={17}/> Filtros</button></div>
-        <div className="match-card"><div className={`profile-placeholder ${current.color}`}><div className="placeholder-top"><span className="distance"><MapPin size={13}/>{current.distance}</span><span className="verified"><Sparkles size={13}/> Nuevas conexiones</span></div><div className="big-initials">{current.initials}</div><div className="photo-hint">Aquí aparecerá la foto de perfil de la usuaria</div><div className="profile-gradient"><h2>{current.name}, {current.age}</h2><p><MapPin size={15}/>{current.city}</p></div></div>
+        <div className={`match-card ${isDragging ? "is-dragging" : ""} ${swipeDirection ? `swipe-${swipeDirection}` : ""}`} style={{ transform: swipeDirection ? undefined : `translateX(${dragX}px) rotate(${dragX * 0.045}deg)`, transition: isDragging ? "none" : undefined }} onPointerDown={handleCardPointerDown} onPointerMove={handleCardPointerMove} onPointerUp={handleCardPointerUp} onPointerCancel={handleCardPointerCancel}><div className={`profile-placeholder ${current.color}`}><div className="placeholder-top"><span className="distance"><MapPin size={13}/>{current.distance}</span><span className="verified"><Sparkles size={13}/> Nuevas conexiones</span></div><div className="big-initials">{current.initials}</div><div className="photo-hint">Aquí aparecerá la foto de perfil de la usuaria</div><div className="profile-gradient"><h2>{current.name}, {current.age}</h2><p><MapPin size={15}/>{current.city}</p></div></div>
           <div className="profile-info"><p>{current.bio}</p><div className="tag-row">{current.tags.map(t => <span className="tag" key={t}>{t}</span>)}</div></div>
           <div className="swipe-actions"><button className="round-action pass" aria-label="Pasar" onClick={() => nextPerson(false)}><X size={24}/></button><span className="action-caption">Pasar</span><button className="round-action like" aria-label="Me gusta" onClick={() => nextPerson(true)}><Heart size={25} fill="currentColor"/></button><span className="action-caption">Me gusta</span></div>
-        </div><p className="center-note">Una amistad empieza con un simple hola ✨</p>
+        </div><p className="center-note">Desliza a la derecha para dar like · a la izquierda para pasar ✨</p>
       </section>}
       {tab === "chats" && <section className="content-view"><p className="eyebrow">YOUR CONNECTIONS</p><h1>Tus chats<span className="pink-dot">.</span></h1><p className="muted">Las conversaciones empiezan cuando el match es mutuo.</p><div className="empty-state"><div className="empty-icon"><MessageCircle size={27}/></div><h3>Tu próxima conversación empieza aquí</h3><p>Cuando conectes con otra girl, aparecerá aquí vuestro chat privado.</p><button className="primary-button" onClick={() => setTab("match")}>Descubrir girls</button></div></section>}
       {tab === "community" && <section className="content-view community-view"><div className="section-heading"><div><p className="eyebrow">THE GIRLYS COMMUNITY</p><h1>Hablemos de todo<span className="pink-dot">.</span></h1><p className="muted">Un espacio para compartir, preguntar y sentirte acompañada.</p></div><button className="primary-button compact" onClick={() => setShowComposer(true)}><Plus size={17}/> Publicar</button></div>
